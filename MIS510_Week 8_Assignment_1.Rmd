@@ -1,0 +1,248 @@
+---
+title: "MIS 510 Portfolio Project Option 1"
+author: "Balajee SK"
+date: "01/15/2022"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 1
+
+Apply what you learned in this course about data exploration by selecting and running appropriate data exploration functions. Run at least five functions.
+
+##Answer:
+
+1. I have used the exploration functions - dim, summary, head, length and view
+2. There are 1000 data points and 32 variables in the Banks dataset
+3. There are many "Binary" type variables like NEW_CAR, USED_CAR, FURNITURE, RADIO.TV, EDUCATION, RETRAINING, MALE_DIV, MALE_SINGLE, MALE_MAR_or_WID, CO.APPLICANT, GUARANTOR, REAL_ESTATE, PROP_UNKN_NONE, OTHER_INSTALL, RENT, OWN_RES, TELEPHONE,    FOREIGN and RESPONSE  
+4. The feature - "Amount" has the highest min value of '250', max value of '18424' and mean value of '3271' indicating that this might be one of the significant dimension in the dataset
+5. Excluding the "Binary"type dimensions, the "SAV_ACCT" dimension has the lowest mean value of '1.105'
+6. The feature - "OBS." is like a serial number that has values from 1 to 1000 sequentially increasing for data point.
+7. The value of the dimension - "AMOUNT" is high for bad credit data points (RESPONSE = 0) when compared to the good credit data points (RESPONSE = 1)
+
+```{r}
+
+
+library(explore)
+library(dplyr)
+
+German_credit.df <- read.csv ("C:/Users/balaj/Documents/SKB/OMSA/CSU Global/MIS510/Week 8/GermanCredit.csv",header = TRUE)
+
+
+#List of Dimensions/variables in the German Credit data
+dim(German_credit.df)
+
+#Summary for all variables in German Credit data
+summary(German_credit.df)
+
+#View the first 6 data points of data in the German Credit data
+head(German_credit.df)
+
+#Get the length of variables (no. of variables) in the German Credit dataset
+length(German_credit.df)
+
+
+#view all the data in the German Credit dataset
+View(German_credit.df)
+
+```
+
+#---------------------------------------#
+
+## Question 2
+
+Divide the data into training and validation partitions.
+Choose two of the following data mining techniques to explore classification models of this data.
+  - Logistic regression
+  - Classification trees
+  - Neural networks.
+Analyze your results. Include appropriate visualizations in your analysis.
+
+## Answer
+
+
+Below are the steps followed:
+
+1. Read the German credit data in to R
+2. Setup the training and test data split on the German credit data set (65% training and 35% validation)
+3. Fit Logistic regression tree model on the training data
+4. Check the performance on training data by analyzing the AIC value. Plot Confusion matrix and lift chart for this scenario.
+5. Fit the Classification tree model on the German credit training data and plot the same.
+6. Check the performance  classification tree created using training data by analyzing the Calculated R^2 value.
+7. Follow the steps# 3 and 4 for validation data with significant predictors from trained data model as well and finally compare all the AIC values. Plot Confusion matrix and lift chart for this scenario.
+8. Fit the Classification tree model on the German credit validation data for significant variables from training data and plot the same.
+9. Check the performance of classification tree created using validation data by analyzing the Calculated R^2 value.
+
+
+- The "AIC" value for our logistic regression model using German credit training data with all features is '647.79' Vs '347.74' for German credit validation data with only the significant features from training data. This proves that Logistic regression model with significant features fits our data better than the one using all features.
+- By analyzing the lift charts, the logistic regression model using German credit training data with all features is better than the model on validation data with only the significant features from training data. This could be clearly understood as the predictive performance in terms of lift of former model (training data) is better than the baseline model.
+- The "Accuracy" of classification tree model using German credit training data with all features is '0.8108' vs '0.8086' for German credit validation data with only the significant features from training data. This proves that the tree containing all variables in training data is more accurate which might be because of containing pure terminal nodes
+
+```{r}
+
+
+
+#Partition the data 
+set.seed(1)
+
+
+#Setting the training index to get 65% of the data so that the remaining 35% goes to validation data
+training.index <- sample(c(1:700),650)
+
+
+#Remove the sequence variable - OBS. from our dataset
+
+German_credit.df_1 <- German_credit.df[2:32]
+
+head(German_credit.df_1)
+
+
+#Splitting the overall data in to training and validation
+
+German_credit_train.df <- German_credit.df_1[training.index,]
+German_credit_val.df <- German_credit.df_1[-training.index,]
+
+dim(German_credit_train.df)
+dim(German_credit_val.df)
+
+
+#Use "Step wise Regression" for selecting the significant attributes from training data
+model_Germancredit_train_st <- glm(RESPONSE~., family = binomial, German_credit_train.df)
+
+Germancredit_train_step <- step(model_Germancredit_train_st, direction = "both")
+
+summary(Germancredit_train_step)
+
+
+############################Training data##############################
+
+#Run a Logistic Regression on training data for significant dimensions
+Germancredit_logreg_train <- glm(RESPONSE ~., family = binomial, German_credit_train.df)
+
+summary(Germancredit_logreg_train)
+
+
+#Lift chart for our German credit training data
+
+library(gains)
+
+pred <- predict(Germancredit_logreg_train, German_credit.df)
+gain <- gains(German_credit.df$RESPONSE, pred, groups=5)
+
+
+plot(c(0,gain$cume.pct.of.total*sum(German_credit_train.df$RESPONSE))~
+     c(0,gain$cume.obs),
+     xlab = "RESPONSE", ylab = "Cumulative", main ="", type ="l")
+
+lines(c(0,sum(German_credit_train.df$RESPONSE))~c(0,dim(German_credit_train.df)[1]), lty=2)
+
+
+###########################
+
+library(rpart)
+library(rpart.plot)
+library(caret)
+
+#Apply tree model on training data
+
+tree_model_train <- rpart(RESPONSE~. , data = German_credit_train.df, method = "class")
+
+
+summary(tree_model_train)
+
+
+#View final classification tree
+
+rpart.plot(tree_model_train)
+
+plot(tree_model_train)
+text(tree_model_train)
+
+
+#Generate Confusion matrix for tree created using training data
+
+
+tree_model_train_class <- predict(tree_model_train, German_credit_train.df, type = "class")
+
+confusionMatrix(tree_model_train_class, as.factor(German_credit_train.df$RESPONSE))
+
+
+############################Validation data##############################
+
+
+#Run a Logistic Regression on validation data for significant dimensions from training data
+Germancredit_logreg_val <- glm(RESPONSE ~ CHK_ACCT + DURATION + HISTORY + NEW_CAR + 
+    USED_CAR + AMOUNT + SAV_ACCT + EMPLOYMENT + INSTALL_RATE + 
+    MALE_SINGLE + GUARANTOR + PROP_UNKN_NONE + OTHER_INSTALL + 
+    RENT + OWN_RES + NUM_CREDITS + TELEPHONE + FOREIGN, family = binomial, German_credit_val.df)
+
+summary(Germancredit_logreg_val)
+
+
+
+#Lift chart for our German credit validation data
+
+library(gains)
+
+pred <- predict(Germancredit_logreg_val, German_credit.df)
+gain <- gains(German_credit.df$RESPONSE, pred, groups=5)
+
+
+plot(c(0,gain$cume.pct.of.total*sum(German_credit_val.df$RESPONSE))~
+     c(0,gain$cume.obs),
+     xlab = "RESPONSE", ylab = "Cumulative", main ="", type ="l")
+
+lines(c(0,sum(German_credit_val.df$RESPONSE))~c(0,dim(German_credit_val.df)[1]), lty=2)
+
+
+###########################
+
+
+#Apply tree model on validation data using significant variables from training data
+
+tree_model_val <- rpart(RESPONSE ~ CHK_ACCT + DURATION + HISTORY + NEW_CAR + 
+    USED_CAR + AMOUNT + SAV_ACCT + EMPLOYMENT + INSTALL_RATE + 
+    MALE_SINGLE + GUARANTOR + PROP_UNKN_NONE + OTHER_INSTALL + 
+    RENT + OWN_RES + NUM_CREDITS + TELEPHONE + FOREIGN, data = German_credit_val.df, method = "class")
+
+
+summary(tree_model_val)
+
+
+#View final classification tree
+
+rpart.plot(tree_model_val)
+
+plot(tree_model_val)
+text(tree_model_val)
+
+
+
+#Generate Confusion matrix for tree created using validation data with significant variables from training data
+
+tree_model_val_class <- predict(tree_model_val, German_credit_val.df, type = "class")
+
+confusionMatrix(tree_model_val_class, as.factor(German_credit_val.df$RESPONSE))
+
+
+
+
+```
+
+#---------------------------------------#
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
